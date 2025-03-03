@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import static java.util.UUID.randomUUID;
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,9 +25,18 @@ class OrderCreatedHandlerTest {
     }
 
     @Test
-    void listen() {
+    void listen_Success() throws ExecutionException, InterruptedException {
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
         orderCreatedHandler.listen(testEvent);
         verify(dispatcherServiceMock, times(1)).process(testEvent);
+    }
+
+    @Test
+    void listen_ServiceThrowsException() throws ExecutionException, InterruptedException {
+        OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
+        doThrow(new RuntimeException("Service failure")).when(dispatcherServiceMock).process(testEvent);
+        orderCreatedHandler.listen(testEvent);
+        verify(dispatcherServiceMock, times(1)).process(testEvent);
+
     }
 }

@@ -2,6 +2,7 @@ package com.bht.dispatch.service;
 
 import com.bht.dispatch.message.OrderCreated;
 import com.bht.dispatch.message.OrderDispatched;
+import com.bht.dispatch.message.OrderUpdated;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -31,5 +32,16 @@ public class DispatcherService {
         kafkaProducer.send(ORDER_DISPATCHED_TOPIC, key, orderDispatched).get();
 
         log.info("Sent message: key: {} -orderId: {} - processedByID: {}", key, orderCreated.getOrderId(), APPLICATION_ID);
+    }
+
+    public void process(String key, OrderUpdated orderUpdated) throws ExecutionException, InterruptedException {
+        OrderDispatched orderDispatched = OrderDispatched.builder()
+                .orderId(orderUpdated.getOrderId())
+                .processedById(APPLICATION_ID)
+                .note("UpdateDispatched: " + orderUpdated.getItem())
+                .build();
+        kafkaProducer.send(ORDER_DISPATCHED_TOPIC, key, orderDispatched).get();
+
+        log.info("Sent message: key: {} -orderId: {} - processedByID: {}", key, orderUpdated.getOrderId(), APPLICATION_ID);
     }
 }

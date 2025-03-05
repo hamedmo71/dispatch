@@ -3,6 +3,7 @@ package com.bht.dispatch;
 import com.bht.dispatch.message.OrderCreated;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +24,8 @@ import java.util.Map;
 @Configuration
 public class DispatchConfiguration {
 
+    private static final String TRUSTED_PACKAGES = "com.bht.dispatch.message";
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(ConsumerFactory<String, Object> consumerFactory) {
         ConcurrentKafkaListenerContainerFactory factory = new ConcurrentKafkaListenerContainerFactory<>();
@@ -36,9 +39,11 @@ public class DispatchConfiguration {
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         config.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
-        config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, OrderCreated.class.getCanonicalName());
+        config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        config.put(JsonDeserializer.TYPE_MAPPINGS,"OrderCreated:com.bht.dispatch.message.OrderCreated, OrderUpdated:com.bht.dispatch.message.OrderUpdated");
+        /*config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, OrderCreated.class.getCanonicalName());*/
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, Boolean.FALSE);
+        /*config.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, Boolean.FALSE);*/
         return new DefaultKafkaConsumerFactory<>(config);
     }
 

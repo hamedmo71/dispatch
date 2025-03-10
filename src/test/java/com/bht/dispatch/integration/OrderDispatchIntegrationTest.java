@@ -55,6 +55,7 @@ class OrderDispatchIntegrationTest {
 
     @Configuration
     static class TestConfig {
+
         @Bean
         public KafkaTestListener testListener() {
             return new KafkaTestListener();
@@ -72,10 +73,10 @@ class OrderDispatchIntegrationTest {
     }
 
     @BeforeEach
-    public void setUp(){
+    public void setUp() {
         kafkaTestListener.orderDispatchedCounter.set(0);
         registry.getListenerContainers().stream().forEach(container ->
-                ContainerTestUtils.waitForAssignment(container,embeddedKafkaBroker.getPartitionsPerTopic()));
+                ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic()));
     }
 
     @Test
@@ -91,6 +92,8 @@ class OrderDispatchIntegrationTest {
         kafkaTemplate.send(MessageBuilder
                 .withPayload(data)
                 .setHeader(KafkaHeaders.TOPIC, topic)
+                .setHeader(KafkaHeaders.KEY, "123")
+                .setHeader(KafkaHeaders.RECEIVED_PARTITION, 0)
                 .build()).get();
     }
 }

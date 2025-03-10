@@ -1,5 +1,6 @@
 package com.bht.dispatch.service;
 
+
 import com.bht.dispatch.message.OrderCreated;
 import com.bht.dispatch.message.OrderDispatched;
 import com.bht.dispatch.util.TestEventData;
@@ -12,9 +13,10 @@ import java.util.concurrent.ExecutionException;
 
 import static java.util.UUID.randomUUID;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.any;
 import static org.hamcrest.Matchers.equalTo;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class DispatcherServiceTest {
@@ -35,17 +37,18 @@ class DispatcherServiceTest {
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
         dispatcherService.process(key, testEvent);
         verify(kafkaProducerMock, times(1)).send(eq("order.dispatched"), eq(key), any(OrderDispatched.class));
+
     }
 
     @Test
     void process_ProducerThrowsException() throws ExecutionException, InterruptedException {
         String key = randomUUID().toString();
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
-        doThrow(new RuntimeException("Producer failure")).when(kafkaProducerMock).send(eq("order.dispatched"), eq(key), any(OrderDispatched.class));
+        doThrow(new RuntimeException("Processing failure")).when(kafkaProducerMock).send(eq("order.dispatched"), eq(key), any(OrderDispatched.class));
 
         RuntimeException runtimeException = assertThrows(RuntimeException.class, () -> dispatcherService.process(key, testEvent));
 
         verify(kafkaProducerMock, times(1)).send(eq("order.dispatched"), eq(key), any(OrderDispatched.class));
-        assertThat(runtimeException.getMessage(), equalTo("Producer failure"));
+        assertThat(runtimeException.getMessage(), equalTo("Processing failure"));
     }
 }

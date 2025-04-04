@@ -4,11 +4,13 @@ import com.bht.dispatch.DispatchConfiguration;
 import com.bht.dispatch.message.OrderCreated;
 import com.bht.dispatch.message.OrderDispatched;
 import com.bht.dispatch.util.TestEventData;
+import kafka.server.Server;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -23,16 +25,21 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
+
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.bht.dispatch.integration.WiremockUtil.stubWiremock;
+import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
 @Slf4j
 @SpringBootTest(classes = {DispatchConfiguration.class})
+@AutoConfigureWireMock(port = 0)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("test")
 @EmbeddedKafka(controlledShutdown = true)
@@ -75,13 +82,36 @@ class OrderDispatchIntegrationTest {
     @BeforeEach
     public void setUp() {
         kafkaTestListener.orderDispatchedCounter.set(0);
+
+        WiremockUtil.reset();
+
         registry.getListenerContainers().stream().forEach(container ->
                 ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic()));
     }
 
     @Test
-    public void testOrderDispatchFlow() throws Exception {
+    public void testOrderDispatchFlow_Success() throws Exception {
+        stubWiremock("/api/stock?item=my-item", 200, "true");
         OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(UUID.randomUUID(), "my-item");
+        sendMessage(ORDER_CREATED_TOPIC, orderCreated);
+
+        await().atMost(10, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(kafkaTestListener.orderDispatchedCounter::get, equalTo(1));
+    }
+
+    @Test
+    public void testOrderDispatchFlow_NotRetryableExceptionTest() throws Exception {
+        stubWiremock("/api/stock?item=my-item", 400, "Bad Request");
+        OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(UUID.randomUUID(), "my-item");
+        sendMessage(ORDER_CREATED_TOPIC, orderCreated);
+        TimeUnit.SECONDS.sleep(3);
+        assertThat(kafkaTestListener.orderDispatchedCounter.get(), equalTo(0));
+    }
+
+    @Test
+    public void testOrderDispatchFlow_RetryThenSuccess() throws Exception {
+        stubWiremock("/api/stock?item=my-item", 503, "Service unavailable", "failOnce", STARTED, "succeedNextTime");
+        stubWiremock("/api/stock?item=my-item", 200, "true", "failOnce", "succeedNextTime", "succeedNextTime");        OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(UUID.randomUUID(), "my-item");
         sendMessage(ORDER_CREATED_TOPIC, orderCreated);
 
         await().atMost(10, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)

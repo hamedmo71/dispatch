@@ -1,5 +1,7 @@
 package com.bht.dispatch.handler;
 
+import com.bht.dispatch.exceptions.NotRetryableException;
+import com.bht.dispatch.exceptions.RetryableException;
 import com.bht.dispatch.message.OrderCreated;
 import com.bht.dispatch.message.OrderUpdated;
 import com.bht.dispatch.service.DispatcherService;
@@ -32,8 +34,12 @@ public class OrderCreatedHandler {
         log.info("Received Message: partition: {} - key: {} -Payload: {}", partition, key, payload);
         try {
             dispatcherService.process(key, payload);
-        } catch (ExecutionException | InterruptedException e) {
-            log.error("Processing failure", e);
+        } catch (RetryableException e) {
+            log.warn("Retryable Exception: ", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Not Retryable Exception: ", e.getMessage());
+            throw new NotRetryableException(e);
         }
     }
 
